@@ -96,8 +96,14 @@ export const CONFIG = {
     critMultiplier: 1.75,
     /** Each hit rolls damage in [1 - v, 1 + v], like Pokémon's damage roll. Keeps small stat edges from deciding every fight. */
     damageVariance: 0.15,
-    /** A battle that goes this long without a winner counts as a loss for the player. */
-    maxTurns: 150,
+    /**
+     * Overtime: once the same two champions have fought for `startTurn` turns, both take true damage at the end
+     * of every turn, `basePct` of max HP the first time and `growthPct` more each turn after. Resets when a new
+     * champion steps in.
+     */
+    overtime: { startTurn: 20, basePct: 0.03, growthPct: 0.03 },
+    /** Safety net only (overtime ends every matchup long before this). Decided by remaining HP if ever reached. */
+    maxTurns: 1000,
     strongMultiplier: 1.2,
     weakMultiplier: 0.85,
   },

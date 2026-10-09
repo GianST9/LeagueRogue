@@ -26,3 +26,20 @@ it('the UI cooldown mirror agrees with the engine: every ability cast was shown 
     expect(view.winner).toBe(result.winner);
   }
 });
+
+it('the replay shows overtime and clears it when the next champion enters', () => {
+  const units = (ids: string[], p: string) => ids.map((defId, i) => ({ uid: `${p}${i}`, defId, level: 18, itemIds: ['warmogs-armor'] }));
+  const player = units(['braum', 'shen'], 'p');
+  const enemy = units(['rammus', 'nautilus'], 'e');
+  const toUnit = (u: (typeof player)[number]) => ({ uid: u.uid, def: championDef(u.defId), level: u.level, itemIds: u.itemIds });
+  const result = simulateBattle({ player: player.map(toUnit), enemy: enemy.map(toUnit), seed: 3 });
+  let view = initialView(player, enemy);
+  let sawOvertime = false;
+  for (const e of result.events) {
+    view = applyEvent(view, e);
+    if (e.t === 'overtime') { expect(view.overtime).toBe(true); sawOvertime = true; }
+    if (e.t === 'enter') expect(view.overtime).toBe(false);
+  }
+  expect(sawOvertime).toBe(true);
+  expect(view.winner).toBe(result.winner);
+});

@@ -204,6 +204,7 @@ export function GuideModal({ onClose }: { onClose: () => void }) {
           <li><strong>Cooldowns:</strong> after using an ability, a champion waits that many of its own turns before it can use it again. Cooldown 0 = every turn. Cooldowns keep ticking while stunned, and every fight starts with everything ready.</li>
           <li>Some abilities (mostly shields and heals) only fire below an HP threshold.</li>
           <li>The ultimate unlocks at level {CONFIG.leveling.ultimateRanks[0]} and gets stronger at levels {CONFIG.leveling.ultimateRanks.slice(1).join(' and ')}.</li>
+          <li><strong>Overtime:</strong> if the same two champions fight for {CONFIG.battle.overtime.startTurn} turns, both start burning for true damage at the end of each turn ({Math.round(CONFIG.battle.overtime.basePct * 100)}% of max HP, +{Math.round(CONFIG.battle.overtime.growthPct * 100)}% every turn) until one falls. The champion with less HP left burns first. It resets when the next champion steps in.</li>
           <li>Damage rolls ±{Math.round(CONFIG.battle.damageVariance * 100)}%. Armor and magic resist reduce damage by resist / (100 + resist).</li>
           <li>Win: everyone still standing heals to full and the whole team gets XP. Knocked-out champions sit out until a Fountain or a boss win. Lose a battle and the run ends.</li>
         </ul>

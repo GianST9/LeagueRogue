@@ -1,3 +1,4 @@
+import { CONFIG } from '../src/core/config';
 import { describe, expect, it } from 'vitest';
 import { CHAMPIONS, CHAMPION_IDS } from '../src/data/champions';
 import { simulateBattle, type BattleUnit } from '../src/systems/battle';
@@ -88,6 +89,49 @@ describe('simulateBattle', () => {
     const avg = totalTurns / fights;
     expect(avg).toBeGreaterThan(3);
     expect(avg).toBeLessThan(25);
+  });
+});
+
+describe('overtime', () => {
+  // Two healing tanks that barely scratch each other.
+  const stalemate = (seed: number) => simulateBattle({
+    player: [unit('braum', 18, { itemIds: ['warmogs-armor', 'spirit-visage'] }), unit('shen', 18, { itemIds: ['warmogs-armor'] })],
+    enemy: [unit('rammus', 18, { itemIds: ['warmogs-armor', 'spirit-visage'] }), unit('nautilus', 18, { itemIds: ['warmogs-armor'] })],
+    seed,
+  });
+
+  it('ends long matchups with a winner instead of a turn-limit loss', () => {
+    for (let seed = 0; seed < 10; seed++) {
+      const r = stalemate(seed);
+      expect(r.turns).toBeLessThan(CONFIG.battle.maxTurns);
+      expect(r.events.some((e) => e.t === 'overtime')).toBe(true);
+      expect(r.events.some((e) => e.t === 'damage' && e.source === 'overtime')).toBe(true);
+    }
+  });
+
+  it('starts after the configured number of turns and resets when a champion enters', () => {
+    const r = stalemate(1);
+    let turnsSinceEnter = 0;
+    for (const e of r.events) {
+      if (e.t === 'enter') turnsSinceEnter = 0;
+      if (e.t === 'turn') turnsSinceEnter++;
+      if (e.t === 'overtime') expect(turnsSinceEnter).toBeGreaterThanOrEqual(CONFIG.battle.overtime.startTurn);
+      if (e.t === 'damage' && e.source === 'overtime') {
+        expect(turnsSinceEnter).toBeGreaterThanOrEqual(CONFIG.battle.overtime.startTurn);
+      }
+    }
+  });
+
+  it('never knocks out both champions in the same overtime tick', () => {
+    for (let seed = 0; seed < 30; seed++) {
+      const r = stalemate(seed);
+      let killsThisTick = 0;
+      for (const e of r.events) {
+        if (e.t === 'turn') killsThisTick = 0;
+        if (e.t === 'damage' && e.source === 'overtime' && e.hp === 0) killsThisTick++;
+        expect(killsThisTick).toBeLessThanOrEqual(1);
+      }
+    }
   });
 });
 

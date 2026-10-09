@@ -80,6 +80,7 @@ export function BattleScreen({ run, phase, act }: { run: RunState; phase: Battle
         <Fighter view={view} side="player" regionTiers={regions.player} />
         <div class="versus">
           <div>{view.turn > 0 ? `Turn ${view.turn}` : STRINGS.vs}</div>
+          {view.overtime && <div class="overtime-badge" title="Both champions take escalating true damage every turn until one falls.">🔥 Overtime</div>}
           {player && enemy && <MatchupArrows player={player} enemy={enemy} />}
         </div>
         <Fighter view={view} side="enemy" regionTiers={regions.enemy} />

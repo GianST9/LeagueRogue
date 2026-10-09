@@ -34,6 +34,8 @@ export type BattleEvent =
   | { t: 'buff'; side: Side; slot: number; stat: StatKey; pct: number }
   | { t: 'stasis'; side: Side; slot: number }
   | { t: 'dodge'; side: Side; slot: number }
+  /** The current matchup has gone on too long: both champions start burning. */
+  | { t: 'overtime' }
   /** A region bonus triggered for this champion (the effect itself follows as its own event). */
   | { t: 'region'; side: Side; slot: number; region: Region }
   | { t: 'revive'; side: Side; slot: number; hp: number }
@@ -57,7 +59,7 @@ export interface BattleResult {
   regions: Record<Side, Partial<Record<Region, number>>>;
 }
 
-export type DamageSource = 'hit' | 'dot' | 'reflect' | 'burn' | 'bonus';
+export type DamageSource = 'hit' | 'dot' | 'reflect' | 'burn' | 'bonus' | 'overtime';
 
 interface Buff extends BuffSpec { remaining: number }
 interface Dot { perTurn: number; type: DamageType; remaining: number; tag?: 'zaun' | 'burn' }
@@ -101,6 +103,8 @@ class Battle {
   private teams: Record<Side, Fighter[]>;
   private active: Record<Side, number> = { player: 0, enemy: 0 };
   private regions: Record<Side, Partial<Record<Region, number>>>;
+  /** Turns the current pair of champions has been fighting; reset whenever a champion enters. */
+  private matchupTurns = 0;
 
   constructor(player: BattleUnit[], enemy: BattleUnit[], private rng: Rng) {
     if (player.length === 0 || enemy.length === 0) throw new Error('Both teams need at least one champion');
@@ -124,6 +128,8 @@ class Battle {
 
     for (let turn = 1; turn <= CONFIG.battle.maxTurns; turn++) {
       this.log({ t: 'turn', n: turn });
+      // Only full turns count toward overtime; a champion entering mid-turn starts at 0.
+      this.matchupTurns++;
       const p = this.current('player');
       const e = this.current('enemy');
       for (const actor of this.turnOrder(p, e)) {
@@ -134,8 +140,29 @@ class Battle {
       }
       this.endOfTurn();
       if (this.resolveKOs()) return this.finish(this.winner(), turn);
+      this.overtime();
+      if (this.resolveKOs()) return this.finish(this.winner(), turn);
     }
-    return this.finish('enemy', CONFIG.battle.maxTurns);
+    // Unreachable in practice: overtime ends every matchup. Fall back to whoever has more HP left.
+    const hpFraction = (side: Side) => this.teams[side].reduce((sum, f) => sum + f.hp / f.maxHp, 0);
+    return this.finish(hpFraction('player') >= hpFraction('enemy') ? 'player' : 'enemy', CONFIG.battle.maxTurns);
+  }
+
+  /**
+   * Escalating burn on a matchup that won't end. The champion with less HP left burns first; if it falls,
+   * the other isn't burned this turn, so overtime never causes a double knockout.
+   */
+  private overtime(): void {
+    const { startTurn, basePct, growthPct } = CONFIG.battle.overtime;
+    if (this.matchupTurns < startTurn) return;
+    if (this.matchupTurns === startTurn) this.log({ t: 'overtime' });
+    const pct = basePct + growthPct * (this.matchupTurns - startTurn);
+    const pair = [this.current('player'), this.current('enemy')].sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp);
+    for (const f of pair) {
+      if (f.hp <= 0) continue;
+      this.applyDamage(this.current(other(f.side)), f, f.maxHp * pct, 'true', false, 'overtime');
+      if (f.hp <= 0) break;
+    }
   }
 
   // ── turn structure ───────────────────────────────────────────────
@@ -198,6 +225,7 @@ class Battle {
 
   private enter(side: Side, slot: number): void {
     this.active[side] = slot;
+    this.matchupTurns = 0;
     this.log({ t: 'enter', side, slot });
     const f = this.teams[side][slot];
     if (this.isRegion(f, 'Demacia')) {

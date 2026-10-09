@@ -473,6 +473,15 @@ button.mode span { font-weight: 400; font-size: 13px; }
 .sell-button { display: flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 13px; }
 button.mode.armory { border-color: #f5c542; }
 
+/* ── overtime ── */
+.overtime-badge {
+  font-size: 12px; font-weight: 700; color: #ff9a3c;
+  border: 1px solid #ff9a3c; border-radius: 10px; padding: 1px 8px;
+  animation: pulse-glow 1s ease-in-out infinite;
+}
+@keyframes pulse-glow { 50% { box-shadow: 0 0 10px #ff9a3c88; } }
+.float.overtime { color: #ff9a3c; }
+
 /* ── mobile ── */
 @media (max-width: 760px) {
   .with-team, .map-screen { grid-template-columns: 1fr; }

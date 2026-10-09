@@ -109,6 +109,7 @@ Targon, Ixtal and Bandle City arrive when the roster grows.
 ### 4.3 Battle
 - **Sequential 1v1**, like pokelike. Your front champion fights their front champion, and the next one steps in on a KO. Each turn the faster champion acts first.
 - Damage = `power × scalingStat × classMultiplier × (100 / (100 + armor or MR))` × crit × a **±15% damage roll** (like Pokémon's). Without the roll, a tiny stat edge won every fight.
+- **Overtime** (replaces the old 150-turn "you lose" cap): after 20 full turns of the same matchup, both champions take true damage at the end of each turn, 3% of max HP and +3% every turn after. The champion with less HP left burns first, and if it falls the other isn't burned, so there's never a double KO. It resets when a new champion enters. A 1000-turn safety cap remains (decided by remaining HP) but is never reached in practice.
 - **Class counters** (attacker's primary class → defender's classes, multiplied together; all values are in `config.ts`). Tuned down from ×1.3 / ×0.75 to **×1.2 / ×0.85**, because the bigger values decided fights on their own:
 
 | Attacker | Strong vs (×1.2) | Weak vs (×0.85) |

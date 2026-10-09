@@ -32,7 +32,7 @@ export interface FloatText {
   id: number;
   side: Side;
   text: string;
-  kind: 'damage' | 'crit' | 'heal' | 'shield' | 'status' | 'strong' | 'weak' | 'region' | 'true';
+  kind: 'damage' | 'crit' | 'heal' | 'shield' | 'status' | 'strong' | 'weak' | 'region' | 'true' | 'overtime';
 }
 
 export interface BattleView {
@@ -45,6 +45,8 @@ export interface BattleView {
   floats: FloatText[];
   log: string[];
   winner: Side | null;
+  /** The current matchup is in overtime (escalating burn). */
+  overtime: boolean;
 }
 
 export interface UnitSource {
@@ -67,7 +69,7 @@ export function initialView(player: UnitSource[], enemy: UnitSource[]): BattleVi
   return {
     units: { player: player.map(toView), enemy: enemy.map(toView) },
     active: { player: -1, enemy: -1 },
-    turn: 0, acting: null, hit: null, floats: [], log: [], winner: null,
+    turn: 0, acting: null, hit: null, floats: [], log: [], winner: null, overtime: false,
   };
 }
 
@@ -103,7 +105,8 @@ export function applyEvent(prev: BattleView, e: BattleEvent): BattleView {
 
   switch (e.t) {
     case 'turn': v.turn = e.n; break;
-    case 'enter': v.active[e.side] = e.slot; break;
+    case 'enter': v.active[e.side] = e.slot; v.overtime = false; break;
+    case 'overtime': v.overtime = true; break;
     case 'cast': {
       const u = unit(e.side, e.slot);
       v.acting = e.side;
@@ -122,7 +125,7 @@ export function applyEvent(prev: BattleView, e: BattleEvent): BattleView {
       u.hp = e.hp;
       u.shield = e.shield;
       v.hit = e.side;
-      const kind = e.crit ? 'crit' : e.source === 'bonus' ? 'true' : 'damage';
+      const kind = e.crit ? 'crit' : e.source === 'overtime' ? 'overtime' : e.source === 'bonus' ? 'true' : 'damage';
       float(e.side, `-${e.amount}`, kind);
       if (e.source === 'hit' && e.effect !== 'neutral') float(e.side, e.effect === 'strong' ? 'Strong!' : 'Resisted', e.effect);
       break;
@@ -172,6 +175,7 @@ export function eventDelay(e: BattleEvent): number {
     case 'stunned': return 380;
     case 'stasis': case 'dodge': return 400;
     case 'region': return 250;
+    case 'overtime': return 700;
     case 'heal': case 'shield': case 'stun': return 300;
     case 'buff': return 150;
     case 'end': return 0;
@@ -198,6 +202,7 @@ function describe(e: BattleEvent, v: BattleView): string | null {
     case 'revive': return `${name(e.side, e.slot)} is revived!`;
     case 'execute': return `${name(e.side, e.slot)} is executed!`;
     case 'ko': return `${name(e.side, e.slot)} is knocked out!`;
+    case 'overtime': return '🔥 Overtime! Both champions burn harder every turn until one falls.';
     default: return null;
   }
 }
