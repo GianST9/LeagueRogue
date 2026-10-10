@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { createRng } from '../src/core/rng';
 import { CONFIG } from '../src/core/config';
 import { generateMap, findNode, type NodeKind } from '../src/systems/map';
-import { regionStatuses } from '../src/systems/synergies';
-import {
-  buyItem, equipFromBag, modeConfig,
-  availableNodes, chooseItem, chooseLevelUp, chooseRecruit, chooseStarter, continueRun, enterNode, finishBattle,
-  newRun, type RunMode, type RunState,
-} from '../src/systems/run';
-import { ITEMS } from '../src/data/items';
+import { chooseRecruit, chooseStarter, enterNode, newRun, type RunMode } from '../src/systems/run';
+import { playRun } from './bot';
+
+/** Plays a fresh run of a classic mode with the bot. */
+function autoplay(mode: Exclude<RunMode, 'conquest'>, seed: number) {
+  return playRun(newRun(mode, seed));
+}
 
 describe('generateMap', () => {
   it('has the configured layers and a single boss at the end', () => {
@@ -61,81 +61,6 @@ describe('generateMap', () => {
   });
 });
 
-const NODE_PRIORITY: NodeKind[] = ['camp', 'levelup', 'rival', 'item', 'recruit', 'fountain', 'boss'];
-
-/** A simple greedy bot. Returns how far it got. */
-function autoplay(mode: RunMode, seed: number): { state: RunState; won: boolean; mapsCleared: number } {
-  const s = newRun(mode, seed);
-  chooseStarter(s, 0);
-  for (let step = 0; step < 500; step++) {
-    const p = s.phase;
-    switch (p.kind) {
-      case 'map': {
-        const nodes = availableNodes(s);
-        const healthy = s.team.filter((c) => !c.fainted).length;
-        const depleted = healthy * 2 <= s.team.length;
-        const rank = (k: NodeKind) => {
-          if (k === 'fountain' && healthy < s.team.length) return -3;
-          if (k === 'recruit' && s.team.length < CONFIG.team.maxSize) return -2;
-          // A sensible player avoids fights while half the team is knocked out.
-          if (depleted && (k === 'camp' || k === 'rival')) return 10 + NODE_PRIORITY.indexOf(k);
-          return NODE_PRIORITY.indexOf(k);
-        };
-        // Like a human, steer toward a reachable fountain when anyone is knocked out.
-        const reachesFountain = (id: string): boolean => {
-          const node = findNode(s.map, id);
-          return node.kind === 'fountain' || node.next.some(reachesFountain);
-        };
-        const pathRank = (id: string) => (healthy < s.team.length && !reachesFountain(id) ? 5 : 0);
-        const pick = [...nodes].sort((a, b) => rank(a.kind) + pathRank(a.id) - rank(b.kind) - pathRank(b.id))[0];
-        enterNode(s, pick.id);
-        break;
-      }
-      case 'battle': finishBattle(s); break;
-      case 'recruit': {
-        // Chase region bonuses: take the recruit that most improves the team's region tiers.
-        const full = s.team.length >= CONFIG.team.maxSize;
-        const score = (ids: string[]) => regionStatuses(ids).reduce((sum, r) => sum + r.tier * 10 + r.count, 0);
-        let best = { score: -1, index: 0, replace: undefined as string | undefined };
-        p.options.forEach((option, index) => {
-          const candidates = full ? s.team.map((c) => c.uid) : [undefined];
-          for (const replace of candidates) {
-            const ids = [...s.team.filter((c) => c.uid !== replace).map((c) => c.defId), option.defId];
-            const sc = score(ids);
-            if (sc > best.score) best = { score: sc, index, replace };
-          }
-        });
-        chooseRecruit(s, best.index, best.replace);
-        break;
-      }
-      case 'item': chooseItem(s, p.options[0], s.team.find((c) => c.itemIds.length === 0)?.uid); break;
-      case 'levelup': chooseLevelUp(s, p.options[0] ?? null); break;
-      case 'fountain': case 'battleWon': case 'mapComplete': continueRun(s); break;
-      case 'shop': {
-        // Buy the most expensive affordable items, then fill empty slots front to back.
-        let bought = true;
-        while (bought) {
-          bought = false;
-          const affordable = p.offers
-            .map((id, i) => ({ id, i }))
-            .filter((o): o is { id: string; i: number } => !!o.id && ITEMS[o.id].cost <= s.gold)
-            .sort((a, b) => ITEMS[b.id].cost - ITEMS[a.id].cost);
-          if (affordable.length) { buyItem(s, affordable[0].i); bought = true; }
-        }
-        for (const champ of s.team) {
-          while (champ.itemIds.length < modeConfig(s).itemSlots && s.bag.length) equipFromBag(s, s.bag[0], champ.uid);
-        }
-        continueRun(s);
-        break;
-      }
-      case 'gameOver': return { state: s, won: false, mapsCleared: s.mapIndex };
-      case 'victory': return { state: s, won: true, mapsCleared: s.totalMaps };
-      case 'starter': throw new Error('unexpected starter phase');
-    }
-  }
-  throw new Error('run did not finish');
-}
-
 describe('run', () => {
   it('starts with 3 common starters at the start level', () => {
     const s = newRun('short', 1);
@@ -163,7 +88,7 @@ describe('run', () => {
     expect(() => chooseRecruit(s, 0)).toThrow();
   });
 
-  for (const mode of ['short', 'full', 'armory'] as RunMode[]) {
+  for (const mode of ['short', 'full', 'armory'] as const) {
     it(`the bot can play ${mode} runs to completion without errors`, () => {
       const results = Array.from({ length: 40 }, (_, seed) => autoplay(mode, seed));
       const wins = results.filter((r) => r.won).length;

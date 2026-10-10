@@ -498,3 +498,43 @@ button.mode.armory { border-color: #f5c542; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ── Conquest: essence, world map, rune shop ── */
+.essence { color: #6fc3ff; font-weight: 700; }
+.essence.big { font-size: 1.2rem; }
+.rune-note { color: #9ad4ff; }
+button.mode.conquest { border-color: #6fc3ff; }
+.meta-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.meta-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tier-row { margin-top: 16px; }
+.region-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.region-card-conquest { display: flex; flex-direction: column; gap: 6px; cursor: default; text-align: left; }
+.region-card-conquest p { margin: 2px 0; }
+.region-card-conquest button { margin-top: auto; }
+.region-card-conquest.status-locked { opacity: 0.6; }
+.status-label.conquered { color: var(--gold-bright); }
+.status-label.open { color: #9ad4ff; }
+.tabs { display: flex; gap: 8px; margin: 8px 0 12px; }
+.rune-layout { display: grid; grid-template-columns: 240px 1fr; gap: 12px; align-items: start; }
+.rune-intro { grid-column: 1 / -1; margin: 0; }
+.rune-champ-list { list-style: none; margin: 0; padding: 6px; max-height: 520px; overflow-y: auto; }
+.rune-champ {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 6px; background: none; color: var(--text);
+  border: 1px solid transparent; text-align: left; font-weight: 400;
+}
+.rune-champ span:nth-child(2) { flex: 1; }
+.rune-champ.active { border-color: var(--gold-bright); background: var(--panel-2); }
+.rune-page .card-head { margin-bottom: 12px; }
+.rune-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.rune-row { display: flex; align-items: center; gap: 12px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2); }
+.rune-icon { font-size: 1.6rem; width: 36px; text-align: center; }
+.rune-info { flex: 1; min-width: 0; }
+.rune-pips { margin-top: 4px; }
+.unlock-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.unlock-card { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; cursor: default; }
+.unlock-card.owned { opacity: 0.55; }
+.reward-block { margin: 12px 0; padding: 10px 12px; border: 1px solid #2b5a80; border-radius: 8px; }
+@media (max-width: 760px) {
+  .rune-layout { grid-template-columns: 1fr; }
+  .rune-champ-list { max-height: 220px; }
+}

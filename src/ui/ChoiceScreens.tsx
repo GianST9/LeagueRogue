@@ -5,19 +5,22 @@ import type { RunChampion } from '../core/types';
 import { BOSSES, championDef } from '../data/bosses';
 import { ITEMS } from '../data/items';
 import {
-  buyItem, chooseItem, chooseLevelUp, chooseRecruit, chooseStarter, continueRun, modeConfig, rerollCost, rerollShop,
+  buyItem, chooseItem, chooseLevelUp, chooseRecruit, chooseStarter, continueRun, currentRegion, modeConfig, rerollCost, rerollShop,
   sellItem, sellPrice, type Phase, type RunState,
 } from '../systems/run';
 import { ultimateRank } from '../systems/stats';
 import { tierFor } from '../systems/synergies';
 import { REGIONS } from '../data/regions';
+import { regionLook } from '../data/conquest';
 import { ChampIcon, ChampionCard, ItemCard, ItemIcon, TeamPanel, type Act } from './components';
 
 type PhaseOf<K extends Phase['kind']> = Extract<Phase, { kind: K }>;
 
-export function StarterScreen({ phase, act }: { phase: PhaseOf<'starter'>; act: Act }) {
+export function StarterScreen({ run, phase, act }: { run: RunState; phase: PhaseOf<'starter'>; act: Act }) {
+  const region = currentRegion(run);
   return (
     <div class="screen choice-screen">
+      {region && <p class="muted small">{STRINGS.conquestHeader(regionLook(region.id).name)}</p>}
       <h2>{STRINGS.chooseStarter}</h2>
       <div class="cards">
         {phase.options.map((c, i) => <ChampionCard key={c.uid} champ={c} onClick={() => act((s) => chooseStarter(s, i))} />)}
@@ -205,6 +208,31 @@ export function InfoScreen({ run, act, onNewRun }: { run: RunState; act: Act; on
     </ul>
   );
 
+  const rewardLine = ({ xp, gold, essence }: { xp: number; gold: number; essence: number }) => (
+    <p>
+      {STRINGS.xpGained(xp)}
+      {gold > 0 && <> · <span class="gold">{STRINGS.goldGained(gold)}</span></>}
+      {essence > 0 && <> · <span class="essence">{STRINGS.essenceGained(essence)}</span></>}
+    </p>
+  );
+  const region = currentRegion(run);
+  const regionName = region && regionLook(region.id).name;
+  const reward = run.conquest?.settled;
+  const rewardBlock = reward && (
+    <div class="reward-block">
+      <h3>💎 {STRINGS.rewardTitle}</h3>
+      <ul class="gains">
+        <li>{STRINGS.rewardBattles(reward.battles)}</li>
+        {reward.clear > 0 && <li>{STRINGS.rewardClear(reward.clear)}</li>}
+        {reward.firstClear > 0 && <li>{STRINGS.rewardFirstClear(reward.firstClear)}</li>}
+      </ul>
+      <p class="essence">{STRINGS.rewardTotal(reward.total)}</p>
+      {reward.newRegions.length > 0 && (
+        <p class="good">🗺️ {STRINGS.newRegionsOpen(reward.newRegions.map((id) => regionLook(id).name).join(', '))}</p>
+      )}
+    </div>
+  );
+
   let title = '';
   let body: preact.ComponentChildren = null;
   let ending = false;
@@ -215,23 +243,23 @@ export function InfoScreen({ run, act, onNewRun }: { run: RunState; act: Act; on
       break;
     case 'battleWon':
       title = STRINGS.battleWonTitle;
-      body = <><p>{STRINGS.xpGained(p.xp)}{p.gold > 0 && <> · <span class="gold">{STRINGS.goldGained(p.gold)}</span></>}</p>{gainLines(p.gains)}</>;
+      body = <>{rewardLine(p)}{gainLines(p.gains)}</>;
       break;
     case 'mapComplete': {
       const boss = BOSSES.find((b) => b.id === p.bossId)!;
       title = STRINGS.mapCompleteTitle(championDef(boss.aceId).name);
-      body = <><p>{STRINGS.xpGained(p.xp)}{p.gold > 0 && <> · <span class="gold">{STRINGS.goldGained(p.gold)}</span></>}</p>{gainLines(p.gains)}<p>{STRINGS.mapCompleteText}</p></>;
+      body = <>{rewardLine(p)}{gainLines(p.gains)}<p>{STRINGS.mapCompleteText}</p></>;
       break;
     }
     case 'gameOver':
       ending = true;
       title = STRINGS.gameOverTitle;
-      body = <p>{STRINGS.gameOverText(run.mapIndex, run.battlesWon)}</p>;
+      body = <><p>{STRINGS.gameOverText(run.mapIndex, run.battlesWon)}</p>{rewardBlock}</>;
       break;
     case 'victory':
       ending = true;
       title = `🏆 ${STRINGS.victoryTitle}`;
-      body = <p>{STRINGS.victoryText}</p>;
+      body = <><p>{regionName ? STRINGS.conquestVictoryText(regionName) : STRINGS.victoryText}</p>{rewardBlock}</>;
       break;
   }
 
@@ -241,7 +269,7 @@ export function InfoScreen({ run, act, onNewRun }: { run: RunState; act: Act; on
         <h2>{title}</h2>
         {body}
         {ending
-          ? <button onClick={onNewRun}>{STRINGS.mainMenu}</button>
+          ? <button onClick={onNewRun}>{run.conquest ? STRINGS.worldMap : STRINGS.mainMenu}</button>
           : <button onClick={() => act((s) => continueRun(s))}>{STRINGS.continue}</button>}
       </section>
       <TeamPanel run={run} act={act} editable={!ending} />

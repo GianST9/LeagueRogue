@@ -1,6 +1,6 @@
 // Turns the battle event log into a displayable state, one event at a time.
 
-import type { AbilityDef, Region, Side } from '../core/types';
+import type { AbilityDef, Region, Side, StatBonus } from '../core/types';
 import { championDef } from '../data/bosses';
 import { REGIONS } from '../data/regions';
 import type { BattleEvent } from '../systems/battle';
@@ -14,6 +14,7 @@ export interface UnitView {
   level: number;
   itemIds: string[];
   skinLine?: string;
+  statBonus?: StatBonus;
   maxHp: number;
   hp: number;
   shield: number;
@@ -55,14 +56,15 @@ export interface UnitSource {
   level: number;
   itemIds?: string[];
   skinLine?: string;
+  statBonus?: StatBonus;
   hp?: number;
 }
 
 export function initialView(player: UnitSource[], enemy: UnitSource[]): BattleView {
   const toView = (u: UnitSource): UnitView => {
-    const maxHp = computeStats(championDef(u.defId), u.level, u.itemIds, u.skinLine).hp;
+    const maxHp = computeStats(championDef(u.defId), u.level, u.itemIds, u.skinLine, u.statBonus).hp;
     return {
-      uid: u.uid, defId: u.defId, level: u.level, itemIds: u.itemIds ?? [], skinLine: u.skinLine,
+      uid: u.uid, defId: u.defId, level: u.level, itemIds: u.itemIds ?? [], skinLine: u.skinLine, statBonus: u.statBonus,
       maxHp, hp: Math.min(maxHp, u.hp ?? maxHp), shield: 0, fainted: false, stunned: false, cooldowns: {},
     };
   };

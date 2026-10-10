@@ -3,7 +3,7 @@ import { useState } from 'preact/hooks';
 import { championIconUrl, itemIconUrl } from '../core/assets';
 import { CLASS_COUNTERS, CONFIG } from '../core/config';
 import { STRINGS } from '../core/strings';
-import type { AbilityDef, Region, RunChampion } from '../core/types';
+import type { AbilityDef, Region, RunChampion, StatBonus, StatKey } from '../core/types';
 import { championDef } from '../data/bosses';
 import { ITEMS } from '../data/items';
 import { REGION_TIERS, REGIONS } from '../data/regions';
@@ -23,6 +23,19 @@ export function ChampIcon({ defId, size = 56, fainted, skinLine }: {
       <img src={championIconUrl(def.ddragonId)} alt={def.name} width={size} height={size} loading="lazy" />
     </span>
   );
+}
+
+const BONUS_LABEL: Record<StatKey, string> = { hp: 'HP', ad: 'AD', ap: 'AP', armor: 'armor', mr: 'MR', speed: 'speed', crit: 'crit' };
+
+/** "+10% HP, +5% AD/AP": stats with the same bonus are grouped. */
+export function bonusText(bonus: StatBonus | undefined): string {
+  const groups = new Map<number, string[]>();
+  for (const [key, pct] of Object.entries(bonus ?? {}) as [StatKey, number][]) {
+    if (!pct) continue;
+    const rounded = Math.round(pct * 100);
+    groups.set(rounded, [...(groups.get(rounded) ?? []), BONUS_LABEL[key]]);
+  }
+  return [...groups].map(([pct, stats]) => `+${pct}% ${stats.join('/')}`).join(', ');
 }
 
 export function ItemIcon({ itemId, size = 28 }: { itemId: string; size?: number }) {
@@ -103,11 +116,12 @@ export function ChampionCard({ champ, onClick, footer, note }: {
         {def.abilities.map((a) => <AbilityLine key={a.key} ability={a} />)}
         <AbilityLine ability={def.ultimate} locked={champ.level < ultLevel ? ultLevel : undefined} />
       </ul>
+      {champ.statBonus && <div class="small rune-note">✦ {STRINGS.bonusStats}: {bonusText(champ.statBonus)}</div>}
       {champ.skinLine && <div class="small skin-note">✨ Skin-line variant: +{CONFIG.skinLine.statBonus * 100}% stats</div>}
       {footer}
     </button>
     <button class="inspect-btn" title={STRINGS.details} aria-label={`${STRINGS.details}: ${def.name}`}
-      onClick={() => inspect({ defId: champ.defId, level: champ.level, itemIds: champ.itemIds, skinLine: champ.skinLine })}>i</button>
+      onClick={() => inspect({ defId: champ.defId, level: champ.level, itemIds: champ.itemIds, skinLine: champ.skinLine, statBonus: champ.statBonus })}>i</button>
     </div>
   );
 }
@@ -179,6 +193,7 @@ export function TeamPanel({ run, act, editable }: { run: RunState; act: Act; edi
       <div class="team-head">
         <h3>{STRINGS.team} <span class="muted small">({run.team.length}/{CONFIG.team.maxSize})</span></h3>
         {mc.shop && <span class="gold" title={STRINGS.goldHint}>💰 {run.gold}</span>}
+        {run.conquest && <span class="essence" title={STRINGS.essenceHint}>💎 {run.conquest.essence}</span>}
       </div>
       {editable && <p class="muted small">{STRINGS.orderHint}</p>}
       <ol class="team-list">
@@ -189,7 +204,7 @@ export function TeamPanel({ run, act, editable }: { run: RunState; act: Act; edi
           return (
             <li key={c.uid} class={c.fainted ? 'fainted-row' : ''}>
               <button class="icon-button" title={`${STRINGS.details}: ${def.name}`}
-                onClick={() => inspect({ defId: c.defId, level: c.level, itemIds: c.itemIds, skinLine: c.skinLine, hp: c.hp,
+                onClick={() => inspect({ defId: c.defId, level: c.level, itemIds: c.itemIds, skinLine: c.skinLine, statBonus: c.statBonus, hp: c.hp,
                   regionTier: tiers[def.region] })}>
                 <ChampIcon defId={c.defId} size={44} fainted={c.fainted} skinLine={c.skinLine} />
               </button>

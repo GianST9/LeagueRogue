@@ -44,7 +44,7 @@ describe('Armory maps', () => {
 function atShop(gold: number): RunState {
   const s = newRun('armory', 11);
   chooseStarter(s, 0);
-  s.phase = { kind: 'mapComplete', bossId: s.bossOrder[0], xp: 0, gold: 0, gains: [] };
+  s.phase = { kind: 'mapComplete', bossId: s.bossOrder[0], xp: 0, gold: 0, essence: 0, gains: [] };
   s.gold = gold;
   continueRun(s);
   return s;

@@ -3,9 +3,10 @@
 
 import { CONFIG, type ModeConfig } from '../core/config';
 import { createRng, type Rng } from '../core/rng';
-import type { ItemTier, RunChampion } from '../core/types';
+import type { ItemTier, RunChampion, StatBonus } from '../core/types';
 import { BOSSES, championDef, type BossDef } from '../data/bosses';
 import { CHAMPIONS, CHAMPION_IDS } from '../data/champions';
+import { conquestRegion, regionEnemyBonus, type ConquestRegion } from '../data/conquest';
 import { CLASSIC_ITEM_IDS, ITEMS, itemIdsOfTier } from '../data/items';
 import { simulateBattle, type BattleResult, type BattleUnit } from './battle';
 import { fullHeal, grantXp, maxHpOf, setLevel } from './leveling';
@@ -20,6 +21,8 @@ export interface EnemyUnit {
   defId: string;
   level: number;
   itemIds: string[];
+  /** Region difficulty bonus (Conquest mode). */
+  statBonus?: StatBonus;
 }
 
 export interface LevelGain {
@@ -36,8 +39,8 @@ export type Phase =
   | { kind: 'item'; options: string[] }
   | { kind: 'levelup'; options: string[] }
   | { kind: 'fountain' }
-  | { kind: 'battleWon'; fight: FightKind; xp: number; gold: number; gains: LevelGain[] }
-  | { kind: 'mapComplete'; bossId: string; xp: number; gold: number; gains: LevelGain[] }
+  | { kind: 'battleWon'; fight: FightKind; xp: number; gold: number; essence: number; gains: LevelGain[] }
+  | { kind: 'mapComplete'; bossId: string; xp: number; gold: number; essence: number; gains: LevelGain[] }
   /** Armory shop after a region boss. A null offer was already bought. */
   | { kind: 'shop'; offers: (string | null)[]; rerolls: number }
   | { kind: 'gameOver'; fight: FightKind }
@@ -62,6 +65,33 @@ export interface RunState {
   nextUid: number;
   phase: Phase;
   battlesWon: number;
+  /** Conquest mode only. */
+  conquest?: ConquestRun;
+}
+
+/** What the meta-progression hands a Conquest run. */
+export interface ConquestSetup {
+  regionId: string;
+  /** Unlocked champion ids: the starter choice and the recruit pool. */
+  roster: string[];
+  /** Rune bonus per champion id. */
+  runes: Record<string, StatBonus>;
+}
+
+export interface ConquestRun extends ConquestSetup {
+  /** Essence earned so far; banked into the meta-progression when the run ends. */
+  essence: number;
+  /** Set once the run's essence has been banked. */
+  settled?: ConquestReward;
+}
+
+export interface ConquestReward {
+  battles: number;
+  clear: number;
+  firstClear: number;
+  total: number;
+  /** Regions this conquest opened up. */
+  newRegions: string[];
 }
 
 export function modeConfig(s: RunState): ModeConfig {
@@ -70,7 +100,8 @@ export function modeConfig(s: RunState): ModeConfig {
 
 // ── setup ──────────────────────────────────────────────────────────
 
-export function newRun(mode: RunMode, seed: number): RunState {
+export function newRun(mode: RunMode, seed: number, conquest?: ConquestSetup): RunState {
+  if ((mode === 'conquest') !== !!conquest) throw new Error('Conquest runs (and only they) need a conquest setup');
   const rng = createRng(seed);
   const mc = CONFIG.run.modes[mode];
   const state: RunState = {
@@ -79,7 +110,10 @@ export function newRun(mode: RunMode, seed: number): RunState {
     rngState: 0,
     totalMaps: mc.maps,
     mapIndex: 0,
-    bossOrder: rng.shuffle(BOSSES.map((b) => b.id)).slice(0, mc.maps),
+    bossOrder: conquest
+      // The region's own boss guards the last map; bosses from elsewhere guard the ones before.
+      ? [...rng.shuffle(BOSSES.map((b) => b.id).filter((id) => id !== conquest.regionId)).slice(0, mc.maps - 1), conquest.regionId]
+      : rng.shuffle(BOSSES.map((b) => b.id)).slice(0, mc.maps),
     map: generateMap(rng, 0, excludedNodes(mc)),
     position: null,
     visited: [],
@@ -89,9 +123,12 @@ export function newRun(mode: RunMode, seed: number): RunState {
     nextUid: 1,
     phase: { kind: 'map' },
     battlesWon: 0,
+    conquest: conquest && { ...conquest, roster: [...conquest.roster], essence: 0 },
   };
+  // Conquest: start with any champion from your collection. Otherwise 1 of 3 random commons.
   const commons = CHAMPION_IDS.filter((id) => CHAMPIONS[id].rarity === 'common');
-  const options = rng.shuffle(commons).slice(0, 3).map((id) => makeChampion(state, rng, id, CONFIG.run.startLevel));
+  const starterIds = conquest ? conquest.roster : rng.shuffle(commons).slice(0, 3);
+  const options = starterIds.map((id) => makeChampion(state, rng, id, CONFIG.run.startLevel));
   state.phase = { kind: 'starter', options };
   state.rngState = rng.state();
   return state;
@@ -132,11 +169,11 @@ export function enterNode(s: RunState, nodeId: string): void {
       case 'camp':
       case 'rival':
       case 'boss':
-        startBattle(s, rng, node.kind, buildEnemies(s, rng, node));
+        startBattle(s, rng, node.kind, applyDifficulty(s, buildEnemies(s, rng, node)));
         break;
       case 'recruit': {
         const owned = new Set(s.team.map((c) => c.defId));
-        const pool = CHAMPION_IDS.filter((id) => !owned.has(id));
+        const pool = (s.conquest?.roster ?? CHAMPION_IDS).filter((id) => !owned.has(id));
         const level = Math.max(CONFIG.run.startLevel, Math.round(averageLevel(s)));
         const options = rng.shuffle(pool).slice(0, CONFIG.run.recruitOptions).map((id) => makeChampion(s, rng, id, level));
         s.phase = { kind: 'recruit', options };
@@ -161,11 +198,13 @@ export function enterNode(s: RunState, nodeId: string): void {
 // ── battles ────────────────────────────────────────────────────────
 
 export function toBattleUnit(c: RunChampion): BattleUnit {
-  return { uid: c.uid, def: championDef(c.defId), level: c.level, itemIds: c.itemIds, skinLine: c.skinLine, hp: c.hp };
+  return {
+    uid: c.uid, def: championDef(c.defId), level: c.level, itemIds: c.itemIds, skinLine: c.skinLine, statBonus: c.statBonus, hp: c.hp,
+  };
 }
 
 export function enemyToBattleUnit(e: EnemyUnit): BattleUnit {
-  return { uid: e.uid, def: championDef(e.defId), level: e.level, itemIds: e.itemIds };
+  return { uid: e.uid, def: championDef(e.defId), level: e.level, itemIds: e.itemIds, statBonus: e.statBonus };
 }
 
 function startBattle(s: RunState, rng: Rng, fight: FightKind, enemy: EnemyUnit[]): void {
@@ -198,6 +237,8 @@ export function finishBattle(s: RunState): void {
   const xp = Math.round(CONFIG.leveling.xpReward[phase.fight] * mc.xpMultiplier);
   const gold = mc.shop ? CONFIG.armory.goldReward[phase.fight] : 0;
   s.gold += gold;
+  const essence = s.conquest ? Math.round(CONFIG.conquest.essenceReward[phase.fight] * currentRegion(s)!.essenceMultiplier) : 0;
+  if (s.conquest) s.conquest.essence += essence;
   const gains: LevelGain[] = [];
   for (const champ of s.team) {
     const from = champ.level;
@@ -205,14 +246,26 @@ export function finishBattle(s: RunState): void {
   }
 
   if (phase.fight !== 'boss') {
-    s.phase = { kind: 'battleWon', fight: phase.fight, xp, gold, gains };
+    s.phase = { kind: 'battleWon', fight: phase.fight, xp, gold, essence, gains };
     return;
   }
   // Beating a boss revives and heals the whole team, like a gym in pokelike.
   s.team.forEach(fullHeal);
   s.phase = s.mapIndex + 1 >= s.totalMaps
     ? { kind: 'victory' }
-    : { kind: 'mapComplete', bossId: currentBoss(s).id, xp, gold, gains };
+    : { kind: 'mapComplete', bossId: currentBoss(s).id, xp, gold, essence, gains };
+}
+
+/** The region being conquered, in Conquest mode. */
+export function currentRegion(s: RunState): ConquestRegion | undefined {
+  return s.conquest && conquestRegion(s.conquest.regionId);
+}
+
+/** Conquest: harder regions give every enemy a stat bonus. */
+function applyDifficulty(s: RunState, enemies: EnemyUnit[]): EnemyUnit[] {
+  const region = currentRegion(s);
+  const statBonus = region && regionEnemyBonus(region);
+  return statBonus ? enemies.map((e) => ({ ...e, statBonus })) : enemies;
 }
 
 function buildEnemies(s: RunState, rng: Rng, node: MapNode): EnemyUnit[] {
@@ -319,6 +372,12 @@ export function continueRun(s: RunState): void {
     default:
       throw new Error(`Nothing to continue from in phase ${s.phase.kind}`);
   }
+}
+
+/** Ends the run early, counted as a defeat. A Conquest run still banks the essence earned so far. */
+export function abandonRun(s: RunState): void {
+  if (s.phase.kind === 'victory' || s.phase.kind === 'gameOver') return;
+  s.phase = { kind: 'gameOver', fight: 'camp' };
 }
 
 function nextMap(s: RunState): void {
@@ -449,6 +508,8 @@ function makeChampion(s: RunState, rng: Rng, defId: string, level: number): RunC
     uid: `c${s.nextUid++}`, defId, level, xp: 0, hp: 0, fainted: false, itemIds: [],
     skinLine: rng.chance(CONFIG.skinLine.chance) ? rng.pick(SKIN_LINES) : undefined,
   };
+  const runes = s.conquest?.runes[defId];
+  if (runes && Object.keys(runes).length > 0) champ.statBonus = runes;
   champ.hp = maxHpOf(champ);
   return champ;
 }

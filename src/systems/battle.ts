@@ -4,7 +4,7 @@
 import { CONFIG } from '../core/config';
 import { createRng, type Rng } from '../core/rng';
 import type {
-  AbilityDef, BuffSpec, ChampionDef, DamageSpec, DamageType, HealSpec, ItemDef, ItemEffects, Region, Side, Stats, StatKey,
+  AbilityDef, BuffSpec, ChampionDef, DamageSpec, DamageType, HealSpec, ItemDef, ItemEffects, Region, Side, StatBonus, Stats, StatKey,
 } from '../core/types';
 import { ITEMS } from '../data/items';
 import { classMultiplier, type Effectiveness, effectivenessOf, mitigate } from './damage';
@@ -17,6 +17,7 @@ export interface BattleUnit {
   level: number;
   itemIds?: string[];
   skinLine?: string;
+  statBonus?: StatBonus;
   /** Starting HP; defaults to max. */
   hp?: number;
 }
@@ -466,7 +467,7 @@ class Battle {
 }
 
 function makeFighter(side: Side, slot: number, unit: BattleUnit, tiers: Partial<Record<Region, number>>): Fighter {
-  const stats = computeStats(unit.def, unit.level, unit.itemIds, unit.skinLine);
+  const stats = computeStats(unit.def, unit.level, unit.itemIds, unit.skinLine, unit.statBonus);
   const items = (unit.itemIds ?? []).map((id) => ITEMS[id]);
   const regionBonus = regionValue(unit.def.region, tiers[unit.def.region]);
   if (unit.def.region === 'Piltover') stats.speed *= 1 + regionBonus;

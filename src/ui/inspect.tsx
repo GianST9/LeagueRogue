@@ -4,7 +4,8 @@ import type { ComponentChildren } from 'preact';
 import { createContext } from 'preact';
 import { useContext, useEffect } from 'preact/hooks';
 import { CLASS_COUNTERS, CONFIG } from '../core/config';
-import type { AbilityDef, ClassName, Region, StatKey, Stats } from '../core/types';
+import { STRINGS } from '../core/strings';
+import type { AbilityDef, ClassName, Region, StatBonus, StatKey, Stats } from '../core/types';
 import { championDef } from '../data/bosses';
 import { CHAMPION_IDS, CHAMPIONS } from '../data/champions';
 import { ITEMS } from '../data/items';
@@ -12,13 +13,15 @@ import { REGION_TIERS, REGIONS } from '../data/regions';
 import { xpToNext } from '../systems/leveling';
 import { computeStats, ultimateRank } from '../systems/stats';
 import { abilityLines, cooldownText } from './abilityText';
-import { ChampIcon, ItemIcon, Tags } from './components';
+import { bonusText, ChampIcon, ItemIcon, Tags } from './components';
 
 export interface InspectTarget {
   defId: string;
   level: number;
   itemIds?: string[];
   skinLine?: string;
+  /** Rune bonus (player) or region difficulty bonus (enemy). */
+  statBonus?: StatBonus;
   hp?: number;
   /** Active region tier for this champion's lineup, if known. */
   regionTier?: number;
@@ -57,8 +60,8 @@ const STAT_ROWS: { key: StatKey; label: string; format: (v: number) => string; n
 
 export function InspectModal({ target, onClose }: { target: InspectTarget; onClose: () => void }) {
   const def = championDef(target.defId);
-  const stats = computeStats(def, target.level, target.itemIds, target.skinLine);
-  const base = computeStats(def, target.level, [], target.skinLine);
+  const stats = computeStats(def, target.level, target.itemIds, target.skinLine, target.statBonus);
+  const base = computeStats(def, target.level, [], target.skinLine, target.statBonus);
   const rank = ultimateRank(target.level);
   const items = (target.itemIds ?? []).map((id) => ITEMS[id]);
   const region = REGIONS[def.region];
@@ -95,6 +98,7 @@ export function InspectModal({ target, onClose }: { target: InspectTarget; onClo
               })}
             </tbody>
           </table>
+          {target.statBonus && <p class="small rune-note">✦ {STRINGS.bonusStats}: {bonusText(target.statBonus)} (included above)</p>}
           {items.map((item, i) => (
             <p key={`${item.id}-${i}`} class="small"><ItemIcon itemId={item.id} size={22} /> <strong>{item.name}</strong>: {item.description}</p>
           ))}
@@ -218,6 +222,17 @@ export function GuideModal({ onClose }: { onClose: () => void }) {
           <li>Each champion holds up to {CONFIG.run.modes.armory.itemSlots} items. Item effects stack, except one-off effects (revive, grievous wounds), which use the strongest copy.</li>
           <li>Leveling slows down as you climb: level 1→2 takes {xpToNext(1, 'steep')} XP, level 17→18 takes {xpToNext(17, 'steep')}. Level-up nodes give +{CONFIG.run.modes.armory.levelUpNodeLevels} level.</li>
           <li>Shops sell more legendaries the further you get, and enemies carry more items too.</li>
+        </ul>
+      </section>
+
+      <section class="guide-section">
+        <h3>🗺️ Conquest</h3>
+        <ul class="guide-list">
+          <li>Pick a region on the world map. A Conquest run is {CONFIG.run.modes.conquest.maps} maps with short-run rules; the region's ruler guards the last one.</li>
+          <li>Start with any champion you own. Recruits only come from champions you've unlocked.</li>
+          <li>Fights pay Blue Essence (camp {CONFIG.conquest.essenceReward.camp}, rival {CONFIG.conquest.essenceReward.rival}, boss {CONFIG.conquest.essenceReward.boss}, more in harder regions). You keep it even if you lose. Conquering a region pays a bonus, and a bigger one the first time.</li>
+          <li>Spend essence in the rune shop: unlock champions, or rank up their runes (up to rank {CONFIG.conquest.maxRuneRank}). Runes raise a champion's stats from the start of every Conquest run.</li>
+          <li>Each conquest opens harder regions, where every enemy gets bonus HP, damage and resists. The recommended rune power tells you roughly how many rune ranks per champion even the odds.</li>
         </ul>
       </section>
 

@@ -1,8 +1,9 @@
 import { NODE_INFO, STRINGS } from '../core/strings';
 import { championDef } from '../data/bosses';
+import { regionLook } from '../data/conquest';
 import { REGIONS } from '../data/regions';
 import { findNode } from '../systems/map';
-import { availableNodes, currentBoss, enterNode, modeConfig, type RunState } from '../systems/run';
+import { availableNodes, currentBoss, currentRegion, enterNode, modeConfig, type RunState } from '../systems/run';
 import { ChampIcon, TeamPanel, type Act } from './components';
 
 const WIDTH = 520;
@@ -26,7 +27,14 @@ export function MapScreen({ run, act }: { run: RunState; act: Act }) {
     <div class="screen map-screen">
       <section class="panel map-panel">
         <header class="map-header">
-          <h2>{STRINGS.mapHeader(run.mapIndex + 1, run.totalMaps)}</h2>
+          <div>
+            {currentRegion(run) && (
+              <div class="muted small">
+                {STRINGS.conquestHeader(regionLook(currentRegion(run)!.id).name)}
+              </div>
+            )}
+            <h2>{STRINGS.mapHeader(run.mapIndex + 1, run.totalMaps)}</h2>
+          </div>
           <div class="boss-preview">
             <span class="muted small">{STRINGS.bossAhead}</span>
             <ChampIcon defId={boss.aceId} size={36} />

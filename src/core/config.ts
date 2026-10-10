@@ -20,6 +20,8 @@ const MODES = {
   short: { maps: 3, xpMultiplier: 2.5, xpCurve: 'flat', itemSlots: 1, itemNodes: true, shop: false, levelUpNodeLevels: 2 },
   full: { maps: 8, xpMultiplier: 0.75, xpCurve: 'flat', itemSlots: 1, itemNodes: true, shop: false, levelUpNodeLevels: 2 },
   armory: { maps: 8, xpMultiplier: 1, xpCurve: 'steep', itemSlots: 3, itemNodes: false, shop: true, levelUpNodeLevels: 1 },
+  /** One region per run; its boss is the last of the maps. Rules match the short run. */
+  conquest: { maps: 3, xpMultiplier: 2.5, xpCurve: 'flat', itemSlots: 1, itemNodes: true, shop: false, levelUpNodeLevels: 2 },
 } satisfies Record<string, ModeConfig>;
 
 export const CONFIG = {
@@ -83,6 +85,25 @@ export const CONFIG = {
     enemyMaxItems: 3,
     /** Scales how fast enemy item counts grow (1 = reach the max at the end of the run). */
     enemyItemPace: 0.6,
+  },
+
+  /** Conquest mode: Blue Essence, the rune shop, champion unlocks and region difficulty. */
+  conquest: {
+    /** Essence per won fight, multiplied by the region's `essenceMultiplier`. Kept even when the run is lost. */
+    essenceReward: { camp: 6, rival: 12, boss: 30 },
+    /** Bonus essence for conquering a region (× multiplier), and again on the first conquest. */
+    clearBonus: 60,
+    firstClearBonus: 150,
+    /** Cost to unlock a champion, by rarity. */
+    unlockCost: { common: 250, rare: 500, epic: 900, legendary: 1500 },
+    /** Rune rank r costs `runeRankCost × r` essence. */
+    runeRankCost: 20,
+    maxRuneRank: 5,
+    /**
+     * Per region tier above 1: enemy HP/AD/AP/armor/MR bonus, recommended rune power, and extra essence multiplier.
+     * Five rune ranks (+5% to one stat each) are worth about +5% to everything, so power 5 per tier evens it out.
+     */
+    perTier: { enemyBonus: 0.05, recommendedPower: 5, essenceMultiplier: 0.5 },
   },
 
   abilities: {

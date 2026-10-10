@@ -169,6 +169,20 @@ Same game as the Full run (8 bosses, same map, battles, regions), with these cha
 - **Enemies scale with you:** rivals and bosses carry up to 3 shop items, more and better ones later in the run.
 - Bot benchmark: about 13% of Armory runs won (Full: 10%).
 
+### 4.10 Conquest (fourth mode, meta-progression) ✅
+A campaign across Runeterra that persists between runs (saved in `localStorage`, `src/core/save.ts`).
+- **World map:** 8 regions in 5 tiers, one per region boss. Start with **Demacia (tier 1)**. Conquering a region opens the next ones:
+  Demacia → Noxus, Freljord (T2) → Ionia, Zaun (T3) → Shurima, Shadow Isles (T4) → Bilgewater (T5).
+- **A Conquest run** = 3 maps with short-run rules (×2.5 XP, item nodes, 1 slot). The region's own boss guards the last map; bosses from other regions guard the first two.
+- **Harder regions:** every enemy gets **+5% HP/AD/AP/armor/MR per tier above 1** (T5 = +20%). Each region shows a **recommended rune power** (5 per tier above 1).
+- **Collection:** you own 6 champions at the start (Garen, Lux, Darius, Ashe, Braum, Shen). Your starter is any owned champion, and **recruits only come from owned champions**.
+- **Blue Essence** (the shop currency): fights pay camp 6 / rival 12 / boss 30, ×1 to ×3 by tier. **Kept even when you lose** (or abandon). Conquering pays +60 × tier multiplier, and +150 × multiplier more the first time.
+- **Rune shop** (outside runs): unlock champions (common 250, rare 500) or rank up a champion's runes. 5 runes, ranks 1–5, rank r costs 20 × r:
+  Fury (+5% AD & AP per rank), Vitality (+5% HP), Bulwark (+5% armor), Warding (+5% MR), Swiftness (+4% speed). **Rune power** = total ranks (max 25).
+- Rune and difficulty bonuses use one mechanism: a percentage `StatBonus` applied in `computeStats`, shown in the Inspect window and on cards.
+- Bot benchmark (`npm run balance`): the bot wins ~35% of Demacia runs and 0% of Bilgewater runs with no runes; with every rune maxed, 87% and 45%. A bot campaign that spreads essence over 6 champions conquers all 8 regions in **16–22 runs**.
+- All numbers are in `CONFIG.conquest`; regions and runes in `src/data/conquest.ts`.
+
 ## 5. Milestones
 
 | # | Milestone | Status |
@@ -181,7 +195,8 @@ Same game as the Full run (8 bosses, same map, battles, regions), with these cha
 | M5 | Rift Gauntlet finale after the 8th boss | |
 | M6 | Region bonuses ✅. Still to do: runes, consumables, Tome, Epic, Trade, "?" events, Shop | partly done |
 | — | **Playtest round 1:** map fixed points, Inspect window (stats, ability numbers, cooldowns, matchups), Guide (rules, class chart, regions), cooldown + matchup + region display in battle | ✅ done |
-| M7 | Save/resume, meta-progression, skin-line variants | |
+| — | **Conquest mode:** world map of 8 regions in 5 tiers, Blue Essence, rune shop (champion unlocks + rune pages), saved meta-progression | ✅ done |
+| M7 | Save/resume of a run in progress, skin-line variants (meta-progression ✅ via Conquest) | partly done |
 | M8 | Full roster (auto-generated kits), balance via mass simulation, mobile polish | |
 | M9 | Ironman, Endless, Daily | |
 
@@ -225,6 +240,18 @@ Same game as the Full run (8 bosses, same map, battles, regions), with these cha
 
 **Q20. Next milestone.** Which next: the Rift Gauntlet finale (M5), region synergies + runes (M6, the biggest strategy layer), or save/resume (M7)?
 *[Default: M6, since synergies give team-building its depth]*
+> **Answer:**
+
+**Q21. Conquest pacing.** A bot finishes the whole campaign in about 20 runs (≈ 4–5 hours for a human). Too short, too grindy, or fine?
+*[Default: keep it, retune after a few of your runs]*
+> **Answer:**
+
+**Q22. Conquest bosses.** The first two maps of a Conquest run end with bosses from *other* regions (only the last one is the region's ruler). Alternatives: themed "lieutenant" fights from the region's own champions, or make a Conquest run 1 map long.
+*[Default: keep the current setup]*
+> **Answer:**
+
+**Q23. Runes beyond stats.** Runes are pure stat boosts right now. Later, keystone runes with effects (Conqueror, Electrocute, Grasp…) could be a rarer, pricier rune slot per champion.
+*[Default: add keystones after playtesting the stat runes]*
 > **Answer:**
 
 ---

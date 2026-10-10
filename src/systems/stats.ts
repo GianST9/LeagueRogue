@@ -1,13 +1,15 @@
 import { CONFIG } from '../core/config';
-import type { ChampionDef, Stats, StatKey } from '../core/types';
+import type { ChampionDef, StatBonus, Stats, StatKey } from '../core/types';
 import { ARCHETYPES } from '../data/classes';
 import { ITEMS } from '../data/items';
 
 const STAT_KEYS: StatKey[] = ['hp', 'ad', 'ap', 'armor', 'mr', 'speed', 'crit'];
 const SKIN_BUFFED: StatKey[] = ['hp', 'ad', 'ap', 'armor', 'mr'];
 
-/** Final stats for a champion at a level, including its item and skin-line bonus. */
-export function computeStats(def: ChampionDef, level: number, itemIds: readonly string[] = [], skinLine?: string): Stats {
+/** Final stats for a champion at a level, including its item, skin-line and rune/difficulty bonus. */
+export function computeStats(
+  def: ChampionDef, level: number, itemIds: readonly string[] = [], skinLine?: string, bonus?: StatBonus,
+): Stats {
   const arch = ARCHETYPES[def.classes[0]];
   const stats = {} as Stats;
   for (const key of STAT_KEYS) {
@@ -16,6 +18,9 @@ export function computeStats(def: ChampionDef, level: number, itemIds: readonly 
   }
   if (skinLine) {
     for (const key of SKIN_BUFFED) stats[key] *= 1 + CONFIG.skinLine.statBonus;
+  }
+  if (bonus) {
+    for (const [key, pct] of Object.entries(bonus) as [StatKey, number][]) stats[key] *= 1 + pct;
   }
   for (const id of itemIds) {
     for (const [key, value] of Object.entries(ITEMS[id].stats) as [StatKey, number][]) stats[key] += value * itemStatScale(level);

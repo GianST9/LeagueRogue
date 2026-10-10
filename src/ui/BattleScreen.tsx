@@ -145,7 +145,7 @@ function Fighter({ view, side, regionTiers }: { view: BattleView; side: Side; re
   ].join(' ');
 
   const open = (u: UnitView) => inspect({
-    defId: u.defId, level: u.level, itemIds: u.itemIds, skinLine: u.skinLine, hp: u.hp,
+    defId: u.defId, level: u.level, itemIds: u.itemIds, skinLine: u.skinLine, statBonus: u.statBonus, hp: u.hp,
     regionTier: regionTiers[championDef(u.defId).region],
   });
 
@@ -191,7 +191,7 @@ function Fighter({ view, side, regionTiers }: { view: BattleView; side: Side; re
 /** Q/W/E/R with the turns left before each can be used again. */
 function AbilityChips({ unit }: { unit: UnitView }) {
   const def = championDef(unit.defId);
-  const stats = computeStats(def, unit.level, unit.itemIds, unit.skinLine);
+  const stats = computeStats(def, unit.level, unit.itemIds, unit.skinLine, unit.statBonus);
   const ultLocked = unit.level < CONFIG.leveling.ultimateRanks[0];
   return (
     <div class="ability-chips">

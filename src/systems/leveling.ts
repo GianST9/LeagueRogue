@@ -36,7 +36,7 @@ export function grantXp(champ: RunChampion, amount: number, curve: XpCurve = 'fl
 }
 
 export function maxHpOf(champ: RunChampion): number {
-  return computeStats(CHAMPIONS[champ.defId], champ.level, champ.itemIds, champ.skinLine).hp;
+  return computeStats(CHAMPIONS[champ.defId], champ.level, champ.itemIds, champ.skinLine, champ.statBonus).hp;
 }
 
 /** Fountain: full heal and revive. */

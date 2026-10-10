@@ -9,15 +9,15 @@ The design and roadmap are in [PLAN.md](PLAN.md).
 npm install
 npm run dev       # start the dev server, then open the printed localhost URL and play
 npm test          # unit tests
-npm run balance   # 1v1 win-rate table per champion, plus bot win rates for short/full runs
+npm run balance   # 1v1 win-rate table per champion, bot win rates per mode, and bot Conquest campaigns
 npm run build     # production build in dist/
 ```
 
 ## Layout
 
-- `src/core`: types, seeded RNG, tunable config, UI strings
+- `src/core`: types, seeded RNG, tunable config, UI strings, save (localStorage)
 - `src/data`: champions, items, classes, regions
-- `src/systems`: game rules with no UI (stats, damage, battle, leveling, map, run)
+- `src/systems`: game rules with no UI (stats, damage, battle, leveling, map, run, meta = Conquest progression)
 - `src/ui`: Preact components
 - `tests`: Vitest specs
 

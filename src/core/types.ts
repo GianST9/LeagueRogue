@@ -32,6 +32,9 @@ export interface Stats {
 
 export type StatKey = keyof Stats;
 
+/** Percentage stat bonuses, e.g. { hp: 0.1 } = +10% HP. Runes (player) and region difficulty (enemies) use these. */
+export type StatBonus = Partial<Record<StatKey, number>>;
+
 export interface DamageSpec {
   /** Flat damage, multiplied by the ability level factor. */
   base: number;
@@ -179,6 +182,8 @@ export interface RunChampion {
   itemIds: string[];
   /** Skin-line variant ("shiny"): cosmetic plus a small stat bonus. */
   skinLine?: string;
+  /** Percentage stat bonus from runes (Conquest mode). */
+  statBonus?: StatBonus;
 }
 
 export type Side = 'player' | 'enemy';
