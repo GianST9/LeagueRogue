@@ -255,5 +255,25 @@ A campaign across Runeterra that persists between runs (saved in `localStorage`,
 > **Answer:**
 
 ---
+## 8. Next direction: async PvP (Draft 4, in progress)
+
+**Decided**
+- **Hosting:** GitHub Pages stays the dev site; **Cloudflare Pages** is the public release. `base: './'` already works on both. The async backend goes on Cloudflare too (Pages Functions + D1), with a separate dev database the GitHub Pages build reaches via `VITE_API_URL` + CORS.
+- **Multiplayer:** start with **async PvP in the style of The Bazaar / Backpack Battles**. A run is 10 wins or 3 losses. Each round: shop (buy components, combine items, recruit, runes, positions), upload a snapshot of the build, fight the ghost of another player at the same round and a similar record. Fights run locally from a seed.
+- **Battle:** move away from auto-battles toward LoL-like play: positions (Top/Jungle/Mid/Bot/Support) with position weights, laning → objectives → teamfight, weighted targeting (frontline hit more often), skillshot hit chances, summoner spells.
+- **Items/runes rework:** components and build paths, item actives (Zhonya's, Stopwatch, Galeforce…), a small per-champion item grid with adjacency bonuses (backpack style), keystone runes instead of flat stat runes.
+- **Engine:** refactor `simulateBattle` into a round step `resolveRound(state, actionsBySide)` on plain serializable state; today's AI becomes the default controller, so tests and `npm run balance` keep working.
+- **Ghost backend:** `POST /api/snapshot`, `GET /api/opponent`; snapshots tagged with a `dataVersion` (hash of `src/data`) so ghosts only meet the same balance patch; bot ghosts fill an empty pool. Later: validate builds by replaying `seed + shop actions` server-side.
+
+**Milestones:** (1) `resolveRound` refactor → (2) tactics / manual control → (3) items + keystones rework → (4) async loop vs bot ghosts, no backend → (5) Cloudflare deploy + Functions/D1 → (6) laning/teamfight phases → (7) replay validation, leaderboards, seasons.
+
+**Q24. How do fights work against a ghost?** The opponent isn't online to press buttons.
+- (a) **Tactics:** set rules per champion in the shop ("Zhonya's below 30% HP", "R when target below 40%"); both sides fight on their rules.
+- (b) Manual against a ghost that uses its owner's tactics.
+- (c) Fully automatic like The Bazaar; all decisions in the shop.
+*[Default: (a), with optional manual control of your own side]*
+> **Answer:**
+
+---
 
 *Sources: [pokelike.xyz](https://pokelike.xyz), [pokelike.org guide](https://pokelike.org/), [tcg-actu.fr guide](https://tcg-actu.fr/pokelike-jeu-pokemon-roguelike-guide/), and the in-game text found in pokelike's client bundle.*

@@ -5,7 +5,12 @@ The design and roadmap are in [PLAN.md](PLAN.md).
 
 ## Run it
 
+Needs Node 24 (see `.nvmrc`).
+
 ```bash
+git clone https://github.com/GianST9/LeagueRogue.git
+cd LeagueRogue
+npm ci            # exact versions from package-lock.json
 npm install
 npm run dev       # start the dev server, then open the printed localhost URL and play
 npm test          # unit tests
