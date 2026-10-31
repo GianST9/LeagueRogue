@@ -4,11 +4,11 @@ import { CHAMPIONS } from '../src/data/champions';
 import { CONQUEST_REGIONS, RUNES, STARTING_CHAMPIONS, STARTING_REGION, conquestRegion } from '../src/data/conquest';
 import { maxHpOf } from '../src/systems/leveling';
 import {
-  conquestSetup, newMeta, regionStatus, runeBonus, runePower, runeUpgradeCost, sanitizeMeta, settleRun, unlockChampion,
+  conquestSetup, isModeUnlocked, newMeta, recordModeClear, regionStatus, runeBonus, runePower, runeUpgradeCost, sanitizeMeta, settleRun, unlockChampion,
   unlockCost, upgradeRune, type MetaState,
 } from '../src/systems/meta';
 import {
-  abandonRun, chooseStarter, enterNode, finishBattle, newRun, availableNodes, type RunState,
+  abandonRun, chooseStarter, enterNode, finishBattle, newRun, nodeEnemies, availableNodes, type RunState,
 } from '../src/systems/run';
 import { playRun } from './bot';
 
@@ -100,6 +100,19 @@ describe('conquest runs', () => {
     expect(s.bossOrder).toHaveLength(CONFIG.run.modes.conquest.maps);
     expect(s.bossOrder.at(-1)).toBe(STARTING_REGION);
     expect(new Set(s.bossOrder).size).toBe(s.bossOrder.length);
+  });
+
+  it('face the same bosses every run of a region, while the fights on the way change', () => {
+    const m = newMeta();
+    const a = conquestRun(m, STARTING_REGION, 1);
+    const b = conquestRun(m, STARTING_REGION, 999);
+    expect(b.bossOrder).toEqual(a.bossOrder);
+    const fights = (s: RunState) => s.map.layers.flat().filter((n) => n.kind === 'camp' || n.kind === 'rival').map((n) => nodeEnemies(s, n));
+    expect(fights(b)).not.toEqual(fights(a));
+    for (let map = 0; map < a.totalMaps; map++) {
+      a.mapIndex = b.mapIndex = map;
+      expect(nodeEnemies(b, b.map.layers.at(-1)![0])).toEqual(nodeEnemies(a, a.map.layers.at(-1)![0]));
+    }
   });
 
   it('give runed champions their bonus stats', () => {
@@ -232,5 +245,23 @@ describe('campaign', () => {
 
   it('every roster champion can be unlocked', () => {
     for (const id of Object.keys(CHAMPIONS)) expect(unlockCost(id)).toBeGreaterThan(0);
+  });
+});
+
+describe('mode unlocks', () => {
+  it('opens Armory after a short or full win, and Conquest after an Armory win', () => {
+    const m = newMeta();
+    expect(isModeUnlocked(m, 'short') && isModeUnlocked(m, 'full')).toBe(true);
+    expect(isModeUnlocked(m, 'armory') || isModeUnlocked(m, 'conquest')).toBe(false);
+    recordModeClear(m, 'short');
+    expect(isModeUnlocked(m, 'armory')).toBe(true);
+    expect(isModeUnlocked(m, 'conquest')).toBe(false);
+    recordModeClear(m, 'armory');
+    expect(isModeUnlocked(m, 'conquest')).toBe(true);
+  });
+
+  it('keeps every mode open for saves that already played Conquest', () => {
+    expect(isModeUnlocked(sanitizeMeta({ runsPlayed: 3 }), 'conquest')).toBe(true);
+    expect(isModeUnlocked(sanitizeMeta({ runsPlayed: 3, modesCleared: [] }), 'conquest')).toBe(false);
   });
 });

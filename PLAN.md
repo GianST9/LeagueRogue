@@ -15,7 +15,7 @@ A browser roguelike with the same game loop as [pokelike.xyz](https://pokelike.x
 | **Node types** | Battle, Catch (1 of 3), Item, Trainer (harder), Pokémon Center, Legendary, Move Tutor, Trade, Evolution item, Level Up, Mystery "?", Shiny, Boss. |
 | **Team** | Up to 6, ordered by drag and drop. When the team is full, a new catch replaces someone. |
 | **Battles** | Automatic, sequential 1v1 (front unit vs. front unit). The player's decisions come before the fight. |
-| **Leveling** | Each win levels the whole team. Enemies scale to your team's average level and the map depth. |
+| **Leveling** | Each win levels the whole team. Enemy teams are fixed per node: levels come from a per-mode table by map depth, never from your team. |
 | **Fainting** | A fainted unit is benched until the next Center or gym. In Nuzlocke it's gone for good. |
 | **Items** | One held item per unit. Run-wide passive items. A bag of consumables. |
 | **Type traits** | Having several units of the same type unlocks tiered team bonuses. |

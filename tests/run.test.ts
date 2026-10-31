@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createRng } from '../src/core/rng';
 import { CONFIG } from '../src/core/config';
 import { generateMap, findNode, type NodeKind } from '../src/systems/map';
-import { chooseRecruit, chooseStarter, enterNode, newRun, type RunMode } from '../src/systems/run';
+import { chooseRecruit, chooseStarter, enterNode, newRun, nodeEnemies, type RunMode } from '../src/systems/run';
 import { playRun } from './bot';
 
 /** Plays a fresh run of a classic mode with the bot. */
@@ -72,6 +72,30 @@ describe('run', () => {
 
   it('is deterministic for a seed', () => {
     expect(autoplay('short', 77).state).toEqual(autoplay('short', 77).state);
+  });
+
+  it('enemy teams are fixed by the node, not by your team', () => {
+    const s = newRun('full', 11);
+    chooseStarter(s, 0);
+    const boss = s.map.layers.at(-1)![0];
+    const before = nodeEnemies(s, boss);
+    s.team[0].level = CONFIG.leveling.maxLevel;
+    s.team.push({ ...s.team[0], uid: 'extra' });
+    expect(nodeEnemies(s, boss)).toEqual(before);
+    expect(before.at(-1)!.level).toBe(CONFIG.run.modes.full.enemyLevels[0][1]);
+  });
+
+  it('the fight brings exactly the previewed team', () => {
+    const s = newRun('short', 21);
+    chooseStarter(s, 0);
+    const node = s.map.layers[0].find((n) => n.kind === 'camp')!;
+    const preview = nodeEnemies(s, node);
+    enterNode(s, node.id);
+    expect(s.phase.kind === 'battle' && s.phase.enemy).toEqual(preview);
+  });
+
+  it('every mode has enemy levels for each map', () => {
+    for (const mc of Object.values(CONFIG.run.modes)) expect(mc.enemyLevels).toHaveLength(mc.maps);
   });
 
   it('rejects unreachable nodes', () => {

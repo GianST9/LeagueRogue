@@ -111,8 +111,10 @@ export function newRun(mode: RunMode, seed: number, conquest?: ConquestSetup): R
     totalMaps: mc.maps,
     mapIndex: 0,
     bossOrder: conquest
-      // The region's own boss guards the last map; bosses from elsewhere guard the ones before.
-      ? [...rng.shuffle(BOSSES.map((b) => b.id).filter((id) => id !== conquest.regionId)).slice(0, mc.maps - 1), conquest.regionId]
+      // The region's own boss guards the last map; bosses from elsewhere guard the ones before. Fixed per region,
+      // so conquering a region is always the same three boss fights.
+      ? [...createRng(hashString(`conquest:${conquest.regionId}`))
+        .shuffle(BOSSES.map((b) => b.id).filter((id) => id !== conquest.regionId)).slice(0, mc.maps - 1), conquest.regionId]
       : rng.shuffle(BOSSES.map((b) => b.id)).slice(0, mc.maps),
     map: generateMap(rng, 0, excludedNodes(mc)),
     position: null,
@@ -169,7 +171,7 @@ export function enterNode(s: RunState, nodeId: string): void {
       case 'camp':
       case 'rival':
       case 'boss':
-        startBattle(s, rng, node.kind, applyDifficulty(s, buildEnemies(s, rng, node)));
+        startBattle(s, rng, node.kind, nodeEnemies(s, node));
         break;
       case 'recruit': {
         const owned = new Set(s.team.map((c) => c.defId));
@@ -268,52 +270,82 @@ function applyDifficulty(s: RunState, enemies: EnemyUnit[]): EnemyUnit[] {
   return statBonus ? enemies.map((e) => ({ ...e, statBonus })) : enemies;
 }
 
-function buildEnemies(s: RunState, rng: Rng, node: MapNode): EnemyUnit[] {
+/**
+ * The enemy team on a fight node. Fixed by the run seed and the node alone (never by your team), so it can be
+ * previewed and is the same however you got there.
+ */
+export function nodeEnemies(s: RunState, node: MapNode): EnemyUnit[] {
+  const rng = createRng(nodeSeed(s, node));
+  const mc = modeConfig(s);
+  const kind = node.kind as FightKind;
+  const [first, boss] = mc.enemyLevels[s.mapIndex];
+  const base = first + ((boss - first) * node.layer) / CONFIG.run.layers.length;
+  const level = (bonus = 0) =>
+    clamp(Math.round(base) + CONFIG.run.enemyLevelOffset[kind] + bonus, 1, CONFIG.leveling.maxLevel);
   const progress = runProgress(s, node.layer);
-  const shopMode = modeConfig(s).shop;
-  const level = (bonus: number) => {
-    const curve = 1 + Math.round(progress * CONFIG.run.enemyLevelSpan);
-    const floor = curve - CONFIG.run.enemyCurveSlack;
-    return clamp(Math.max(floor, Math.floor(averageLevel(s))) + bonus, 1, CONFIG.leveling.maxLevel);
-  };
-  const uid = () => `e${s.nextUid++}`;
-  // Classic: at most one legendary, with a chance that grows over the run.
-  // Armory: several shop items, more and better ones as the run goes on, to match the player's shopping.
-  const items = (classicChance: number, armoryProgress: number): string[] => {
-    if (!shopMode) return rng.chance(classicChance) ? [rng.pick(CLASSIC_ITEM_IDS)] : [];
-    const { enemyMaxItems, enemyItemPace } = CONFIG.armory;
-    const count = Math.min(enemyMaxItems, Math.floor(armoryProgress * enemyItemPace * enemyMaxItems + rng.next()));
-    return Array.from({ length: count }, () => rng.pick(itemIdsOfTier(rollTier(rng, armoryProgress))));
-  };
+  const unit = (defId: string, i: number, lvl = level()): EnemyUnit => ({ uid: `e-${node.id}-${i}`, defId, level: lvl, itemIds: [] });
 
-  if (node.kind === 'camp') {
-    const count = 1 + Math.floor(progress * 2);
-    return rng.shuffle(CHAMPION_IDS).slice(0, count).map((defId) => ({ uid: uid(), defId, level: level(-2), itemIds: [] }));
+  let team: EnemyUnit[];
+  if (kind === 'camp') {
+    team = rng.shuffle(CHAMPION_IDS).slice(0, 1 + Math.floor(progress * 2)).map((id, i) => unit(id, i));
+  } else if (kind === 'rival') {
+    team = rng.shuffle(CHAMPION_IDS).slice(0, 2 + Math.floor(progress * 3)).map((id, i) => unit(id, i));
+    giveItems(s, rng, team, progress * 0.5, progress * 0.8);
+  } else {
+    // Boss: themed members first, then the ace. Later bosses bring more champions, topped up from the roster.
+    const def = currentBoss(s);
+    const bossProgress = s.mapIndex / s.totalMaps;
+    const size = Math.min(CONFIG.team.maxSize, 2 + Math.floor(bossProgress * 4));
+    const members = def.team.slice(-(size - 1));
+    while (members.length < size - 1) {
+      members.unshift(rng.pick(CHAMPION_IDS.filter((id) => !members.includes(id) && id !== def.aceId)));
+    }
+    team = members.map((id, i) => unit(id, i));
+    giveItems(s, rng, team, bossProgress * 0.6, bossProgress);
+    // The ace holds its signature item from the second boss on; only the final boss's ace is a level ahead.
+    const ace = unit(def.aceId, size - 1, level(s.mapIndex === s.totalMaps - 1 ? 1 : 0));
+    if (s.mapIndex > 0) {
+      ace.itemIds.push(def.aceItemId);
+      if (mc.shop) ace.itemIds.push(...armoryItems(rng, bossProgress).slice(0, CONFIG.armory.enemyMaxItems - 1));
+    }
+    team.push(ace);
   }
+  return applyDifficulty(s, team);
+}
 
-  if (node.kind === 'rival') {
-    const count = 2 + Math.floor(progress * 3);
-    return rng.shuffle(CHAMPION_IDS).slice(0, count).map((defId) => ({
-      uid: uid(), defId, level: level(-1), itemIds: items(progress * 0.5, progress * 0.8),
-    }));
+/**
+ * Hands out a fixed number of items. Classic: one legendary each to `classicShare` of the team (rounded).
+ * Armory: every champion gets the same number of shop items, more and better as the run goes on.
+ */
+function giveItems(s: RunState, rng: Rng, team: EnemyUnit[], classicShare: number, armoryProgress: number): void {
+  if (modeConfig(s).shop) {
+    for (const e of team) e.itemIds = armoryItems(rng, armoryProgress);
+    return;
   }
+  const holders = rng.shuffle(team).slice(0, Math.round(team.length * classicShare));
+  for (const e of holders) e.itemIds = [rng.pick(CLASSIC_ITEM_IDS)];
+}
 
-  // Boss: themed members first, then the ace. Later bosses bring more champions.
-  const boss = currentBoss(s);
-  const bossProgress = s.mapIndex / s.totalMaps;
-  const size = Math.min(CONFIG.team.maxSize, 2 + Math.floor(bossProgress * 4));
-  let members = boss.team.slice(-(size - 1));
-  while (members.length < size - 1) {
-    const extra = rng.pick(CHAMPION_IDS.filter((id) => !members.includes(id) && id !== boss.aceId));
-    members = [extra, ...members];
-  }
-  // The ace holds its signature item from the second boss on; only the final boss's ace is a level ahead.
-  const aceItems = s.mapIndex === 0 ? [] : [boss.aceItemId];
-  if (shopMode && s.mapIndex > 0) aceItems.push(...items(0, bossProgress).slice(0, CONFIG.armory.enemyMaxItems - 1));
-  return [
-    ...members.map((defId) => ({ uid: uid(), defId, level: level(0), itemIds: items(bossProgress * 0.6, bossProgress) })),
-    { uid: uid(), defId: boss.aceId, level: level(s.mapIndex === s.totalMaps - 1 ? 1 : 0), itemIds: aceItems },
-  ];
+function armoryItems(rng: Rng, progress: number): string[] {
+  const { enemyMaxItems, enemyItemPace } = CONFIG.armory;
+  const count = Math.min(enemyMaxItems, Math.round(progress * enemyItemPace * enemyMaxItems));
+  return Array.from({ length: count }, () => rng.pick(itemIdsOfTier(rollTier(rng, progress))));
+}
+
+/**
+ * Seed for a node's enemy team: the run seed, map and node mixed together. Conquest bosses leave out the run seed,
+ * so a region's bosses bring the same champions, items and levels every run.
+ */
+function nodeSeed(s: RunState, node: MapNode): number {
+  if (s.conquest && node.kind === 'boss') return hashString(`conquest:${s.conquest.regionId}:boss:${s.mapIndex}`);
+  return hashString(node.id, (s.seed ^ Math.imul(s.mapIndex + 1, 0x9e3779b1)) >>> 0);
+}
+
+/** FNV-1a style string hash, optionally mixed into a starting seed. */
+function hashString(text: string, init = 0x811c9dc5): number {
+  let h = init >>> 0;
+  for (const ch of text) h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193) >>> 0;
+  return h;
 }
 
 // ── rewards ────────────────────────────────────────────────────────

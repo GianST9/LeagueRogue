@@ -3,7 +3,7 @@ import { randomSeed } from '../core/rng';
 import { loadMeta, saveMeta } from '../core/save';
 import { STRINGS } from '../core/strings';
 import { BOSSES, championDef } from '../data/bosses';
-import { conquestSetup, settleRun, type MetaState } from '../systems/meta';
+import { conquestSetup, isModeUnlocked, recordModeClear, settleRun, type MetaState } from '../systems/meta';
 import { abandonRun, newRun, type RunMode, type RunState } from '../systems/run';
 import { BattleScreen } from './BattleScreen';
 import { InfoScreen, ItemScreen, LevelUpScreen, RecruitScreen, ShopScreen, StarterScreen } from './ChoiceScreens';
@@ -35,6 +35,12 @@ export function App() {
     const nextRun = structuredClone(run);
     actMeta((m) => settleRun(m, nextRun));
     setRun(nextRun);
+  }, [run]);
+
+  // Winning a classic run opens the next mode on the title screen.
+  useEffect(() => {
+    if (!run || run.conquest || run.phase.kind !== 'victory' || meta.modesCleared.includes(run.mode)) return;
+    actMeta((m) => recordModeClear(m, run.mode));
   }, [run]);
 
   const leaveRun = () => {
@@ -82,7 +88,7 @@ export function App() {
           ) : screen === 'runeShop' ? (
             <RuneShopScreen meta={meta} actMeta={actMeta} onBack={() => setScreen('worldMap')} />
           ) : (
-            <Title onStart={(mode) => setRun(newRun(mode, randomSeed()))} onConquest={() => setScreen('worldMap')} />
+            <Title meta={meta} onStart={(mode) => setRun(newRun(mode, randomSeed()))} onConquest={() => setScreen('worldMap')} />
           )}
         <footer class="legal">{STRINGS.legalDisclaimer}</footer>
       </main>
@@ -107,7 +113,25 @@ function RunView({ run, act, onNewRun }: { run: RunState; act: Act; onNewRun: ()
   }
 }
 
-function Title({ onStart, onConquest }: { onStart: (mode: Exclude<RunMode, 'conquest'>) => void; onConquest: () => void }) {
+interface ModeBox {
+  mode: RunMode;
+  name: string;
+  desc: string;
+  lockHint: string;
+}
+
+const MODE_TIERS: ModeBox[][] = [
+  [
+    { mode: 'short', name: STRINGS.shortRun, desc: STRINGS.shortRunDesc, lockHint: '' },
+    { mode: 'full', name: STRINGS.fullRun, desc: STRINGS.fullRunDesc, lockHint: '' },
+  ],
+  [{ mode: 'armory', name: `🛒 ${STRINGS.armoryRun}`, desc: STRINGS.armoryRunDesc, lockHint: STRINGS.armoryLocked }],
+  [{ mode: 'conquest', name: `🗺️ ${STRINGS.conquestRun}`, desc: STRINGS.conquestRunDesc, lockHint: STRINGS.conquestLocked }],
+];
+
+function Title({ meta, onStart, onConquest }: {
+  meta: MetaState; onStart: (mode: Exclude<RunMode, 'conquest'>) => void; onConquest: () => void;
+}) {
   return (
     <section class="title-screen">
       <h1>{STRINGS.title}</h1>
@@ -115,23 +139,23 @@ function Title({ onStart, onConquest }: { onStart: (mode: Exclude<RunMode, 'conq
       <div class="boss-strip">
         {BOSSES.map((b) => <span key={b.id} title={championDef(b.aceId).name}><ChampIcon defId={b.aceId} size={44} /></span>)}
       </div>
-      <div class="mode-buttons">
-        <button class="mode conquest" onClick={onConquest}>
-          <strong>🗺️ {STRINGS.conquestRun}</strong>
-          <span>{STRINGS.conquestRunDesc}</span>
-        </button>
-        <button class="mode secondary" onClick={() => onStart('short')}>
-          <strong>{STRINGS.shortRun}</strong>
-          <span>{STRINGS.shortRunDesc}</span>
-        </button>
-        <button class="mode secondary" onClick={() => onStart('full')}>
-          <strong>{STRINGS.fullRun}</strong>
-          <span>{STRINGS.fullRunDesc}</span>
-        </button>
-        <button class="mode secondary armory" onClick={() => onStart('armory')}>
-          <strong>🛒 {STRINGS.armoryRun}</strong>
-          <span>{STRINGS.armoryRunDesc}</span>
-        </button>
+      <div class="mode-ladder">
+        {MODE_TIERS.map((tier, i) => (
+          <div key={i} class="mode-tier">
+            {tier.map(({ mode, name, desc, lockHint }) => {
+              const locked = !isModeUnlocked(meta, mode);
+              const cleared = meta.modesCleared.includes(mode);
+              return (
+                <button key={mode} class={`mode ${mode}${locked ? ' locked' : ''}`} disabled={locked}
+                  onClick={() => (mode === 'conquest' ? onConquest() : onStart(mode))}>
+                  <strong>{locked ? '🔒 ' : ''}{name}{cleared ? ' ✓' : ''}</strong>
+                  <span>{desc}</span>
+                  {locked && <em class="mode-lock-hint">{lockHint}</em>}
+                </button>
+              );
+            })}
+          </div>
+        ))}
       </div>
       <ul class="how-to">
         {STRINGS.howToPlay.map((line) => <li key={line}>{line}</li>)}

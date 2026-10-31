@@ -14,14 +14,32 @@ export interface ModeConfig {
   /** Whether a shop opens after each region boss (and fights pay gold). */
   shop: boolean;
   levelUpNodeLevels: number;
+  /**
+   * Enemy levels per map: [first layer, boss]. Fights in between scale linearly, then `enemyLevelOffset` applies.
+   * Fixed numbers, set to where a typical team stands at that point, so your own team's level never changes them.
+   */
+  enemyLevels: readonly (readonly [number, number])[];
 }
 
+
 const MODES = {
-  short: { maps: 3, xpMultiplier: 2.5, xpCurve: 'flat', itemSlots: 1, itemNodes: true, shop: false, levelUpNodeLevels: 2 },
-  full: { maps: 8, xpMultiplier: 0.75, xpCurve: 'flat', itemSlots: 1, itemNodes: true, shop: false, levelUpNodeLevels: 2 },
-  armory: { maps: 8, xpMultiplier: 1, xpCurve: 'steep', itemSlots: 3, itemNodes: false, shop: true, levelUpNodeLevels: 1 },
-  /** One region per run; its boss is the last of the maps. Rules match the short run. */
-  conquest: { maps: 3, xpMultiplier: 2.5, xpCurve: 'flat', itemSlots: 1, itemNodes: true, shop: false, levelUpNodeLevels: 2 },
+  short: {
+    maps: 3, xpMultiplier: 2.5, xpCurve: 'flat', itemSlots: 1, itemNodes: true, shop: false, levelUpNodeLevels: 2,
+    enemyLevels: [[2, 5], [8, 10], [13, 17]],
+  },
+  full: {
+    maps: 8, xpMultiplier: 0.75, xpCurve: 'flat', itemSlots: 1, itemNodes: true, shop: false, levelUpNodeLevels: 2,
+    enemyLevels: [[2, 2], [3, 4], [5, 6], [7, 8], [9, 11], [11, 13], [13, 15], [15, 17]],
+  },
+  armory: {
+    maps: 8, xpMultiplier: 1, xpCurve: 'steep', itemSlots: 3, itemNodes: false, shop: true, levelUpNodeLevels: 1,
+    enemyLevels: [[2, 3], [5, 6], [7, 9], [10, 12], [12, 14], [14, 15], [15, 16], [16, 18]],
+  },
+  /** One region per run; its boss is the last of the maps. Rules match the short run, with gentler enemy levels (regions add their own bonus). */
+  conquest: {
+    maps: 3, xpMultiplier: 2.5, xpCurve: 'flat', itemSlots: 1, itemNodes: true, shop: false, levelUpNodeLevels: 2,
+    enemyLevels: [[2, 5], [7, 10], [12, 16]],
+  },
 } satisfies Record<string, ModeConfig>;
 
 export const CONFIG = {
@@ -36,12 +54,8 @@ export const CONFIG = {
     modes: MODES as Record<keyof typeof MODES, ModeConfig>,
     /** Map layer sizes before the boss node. */
     layers: [3, 4, 3, 4, 3, 2],
-    /**
-     * Enemies match the team's average level. This curve (1 at the start, 1 + span at the end) is a soft floor,
-     * minus `enemyCurveSlack`, so skipping fights is punished but not fatal.
-     */
-    enemyLevelSpan: 15,
-    enemyCurveSlack: 3,
+    /** Added to the mode's `enemyLevels` by fight kind. The final boss's ace is one level higher still. */
+    enemyLevelOffset: { camp: -2, rival: -1, boss: 0 },
     /** Fraction of max HP restored to surviving champions after a won fight. Knocked-out ones stay out. */
     postBattleHeal: 1,
     recruitOptions: 3,

@@ -7,9 +7,11 @@ import { CHAMPIONS } from '../data/champions';
 import {
   CONQUEST_REGIONS, RUNES, STARTING_CHAMPIONS, STARTING_REGION, conquestRegion, runeBonusOf,
 } from '../data/conquest';
-import type { ConquestReward, ConquestSetup, RunState } from './run';
+import type { ConquestReward, ConquestSetup, RunMode, RunState } from './run';
 
 export const META_VERSION = 1;
+
+const CLASSIC_MODES: RunMode[] = ['short', 'full', 'armory'];
 
 export interface MetaState {
   version: number;
@@ -25,6 +27,8 @@ export interface MetaState {
   /** Lifetime stats, for the world map. */
   runsPlayed: number;
   essenceEarned: number;
+  /** Classic modes won at least once; they unlock the next modes on the title screen. */
+  modesCleared: RunMode[];
 }
 
 export function newMeta(): MetaState {
@@ -37,6 +41,7 @@ export function newMeta(): MetaState {
     conquered: [],
     runsPlayed: 0,
     essenceEarned: 0,
+    modesCleared: [],
   };
 }
 
@@ -69,7 +74,27 @@ export function sanitizeMeta(raw: unknown): MetaState {
     conquered: ids(m.conquered, (id) => regionIds.has(id)),
     runsPlayed: num(m.runsPlayed),
     essenceEarned: num(m.essenceEarned),
+    // Saves from before mode unlocks that already played Conquest keep every mode open.
+    modesCleared: m.modesCleared === undefined && num(m.runsPlayed) > 0
+      ? [...CLASSIC_MODES]
+      : ids(m.modesCleared, (id) => CLASSIC_MODES.includes(id as RunMode)) as RunMode[],
   };
+}
+
+// ── mode unlocks ───────────────────────────────────────────────────
+
+/** Short and full runs are always open; winning either opens Armory, and winning Armory opens Conquest. */
+export function isModeUnlocked(m: MetaState, mode: RunMode): boolean {
+  const cleared = (id: RunMode) => m.modesCleared.includes(id);
+  switch (mode) {
+    case 'armory': return cleared('short') || cleared('full');
+    case 'conquest': return cleared('armory');
+    default: return true;
+  }
+}
+
+export function recordModeClear(m: MetaState, mode: RunMode): void {
+  if (CLASSIC_MODES.includes(mode) && !m.modesCleared.includes(mode)) m.modesCleared.push(mode);
 }
 
 // ── champions ──────────────────────────────────────────────────────

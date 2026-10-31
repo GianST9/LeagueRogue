@@ -91,9 +91,12 @@ button:focus-visible, .node.available:focus-visible { outline: 2px solid var(--g
 .title-screen h1 { font-size: 3rem; color: var(--gold); letter-spacing: 0.08em; }
 .tagline { color: var(--muted); margin-top: 0; }
 .boss-strip { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 24px 0; }
-.mode-buttons { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; }
-button.mode { display: flex; flex-direction: column; gap: 4px; min-width: 240px; padding: 16px 24px; }
+.mode-ladder { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.mode-tier { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; width: 100%; max-width: 640px; }
+button.mode { display: flex; flex-direction: column; gap: 4px; flex: 1 1 240px; max-width: 312px; min-height: 110px; padding: 16px 24px; }
 button.mode span { font-weight: 400; font-size: 13px; }
+button.mode.locked { opacity: 0.45; cursor: not-allowed; filter: grayscale(0.7); }
+.mode-lock-hint { font-size: 12px; color: var(--muted); }
 .how-to {
   max-width: 620px;
   margin: 32px auto 0;
@@ -193,6 +196,17 @@ button.mode span { font-weight: 400; font-size: 13px; }
 .map-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .boss-preview { display: flex; align-items: center; gap: 8px; }
 .map { width: 100%; max-height: 72vh; display: block; margin: 8px auto; }
+.map-wrap { position: relative; }
+.boss-lineup {
+  position: absolute; z-index: 5; transform: translate(-50%, 44px); pointer-events: none;
+  background: var(--panel); border: 1px solid #b8312f; border-radius: 8px; padding: 10px 12px;
+  box-shadow: 0 6px 20px #000a; width: max-content; max-width: min(460px, 92vw);
+}
+.boss-lineup-title { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px; }
+.boss-lineup-team { display: flex; align-items: flex-end; justify-content: center; gap: 10px; flex-wrap: wrap; }
+.boss-lineup-member { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 64px; text-align: center; }
+.boss-lineup-member.ace { width: 76px; color: var(--gold-bright); }
+.lineup-items { display: flex; gap: 2px; }
 .edge { stroke: #2a3a50; stroke-width: 3; stroke-dasharray: 6 6; }
 .edge.walked { stroke: var(--gold); stroke-dasharray: none; }
 .edge.open { stroke: var(--gold-bright); stroke-dasharray: 6 4; animation: dash 1s linear infinite; }
